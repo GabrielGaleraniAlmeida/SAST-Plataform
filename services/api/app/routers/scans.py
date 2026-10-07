@@ -16,10 +16,6 @@ import math
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.config import settings
 from app.database import get_db
 from app.models import Scan, ScanStatus
@@ -29,6 +25,9 @@ from app.schemas import (
     ScanListResponse,
     ScanResponse,
 )
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -204,8 +203,7 @@ async def get_scan(
     "/scans/{scan_id}",
     summary="Delete a scan",
     description=(
-        "Permanently deletes the scan and all associated vulnerabilities and "
-        "file records (cascade delete)."
+        "Permanently deletes the scan and all associated vulnerabilities and " "file records (cascade delete)."
     ),
 )
 async def delete_scan(
@@ -226,7 +224,7 @@ async def delete_scan(
 
     await db.delete(scan)
     await db.commit()
-    
+
     return {"detail": "Scan deleted successfully"}
 
 
@@ -238,8 +236,7 @@ async def delete_scan(
     response_model=ScanResponse,
     summary="Cancel a running scan",
     description=(
-        "Signals the Celery worker to stop processing the scan. "
-        "The scan status transitions to *cancelled*."
+        "Signals the Celery worker to stop processing the scan. " "The scan status transitions to *cancelled*."
     ),
 )
 async def cancel_scan(
@@ -260,9 +257,7 @@ async def cancel_scan(
             from app.tasks import celery_app  # noqa: PLC0415
 
             celery_app.control.revoke(scan.celery_task_id, terminate=True)
-            logger.info(
-                "Revoked Celery task %s for scan id=%s", scan.celery_task_id, scan_id
-            )
+            logger.info("Revoked Celery task %s for scan id=%s", scan.celery_task_id, scan_id)
         except Exception as exc:
             logger.warning(
                 "Failed to revoke task %s: %s – proceeding with status update.",

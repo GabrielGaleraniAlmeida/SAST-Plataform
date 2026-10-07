@@ -19,10 +19,6 @@ import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-
 from app.analyzer import AISecurityAnalyzer
 from app.llm_client import OllamaClient
 from app.models import (
@@ -34,6 +30,9 @@ from app.models import (
     SeverityResult,
     VulnerabilityInput,
 )
+from fastapi import FastAPI, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 logging.basicConfig(
     level=logging.INFO,
@@ -104,6 +103,7 @@ async def handle_exception(request: Request, exc: Exception) -> JSONResponse:
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
     )
+
 
 @app.get("/ai/health", response_model=HealthResponse, tags=["Health"])
 async def health_check() -> JSONResponse:
@@ -186,9 +186,9 @@ async def explain(vulnerability: VulnerabilityInput) -> dict:
     )
     explanation = await analyzer.explain_vulnerability(vulnerability)
     return {
-        "rule_id":     vulnerability.rule_id,
-        "rule_name":   vulnerability.rule_name,
-        "file_path":   vulnerability.file_path,
+        "rule_id": vulnerability.rule_id,
+        "rule_name": vulnerability.rule_name,
+        "file_path": vulnerability.file_path,
         "line_number": vulnerability.line_number,
         "explanation": explanation,
     }
@@ -226,17 +226,17 @@ async def batch_analyze(request: BatchRequest) -> BatchResponse:
         explanation_outcomes = await asyncio.gather(*explanation_tasks, return_exceptions=True)
     results: list[BatchFindingResult] = []
     processed = 0
-    failed    = 0
+    failed = 0
 
     for i, vuln in enumerate(vulnerabilities):
-        sev_outcome  = severity_outcomes[i]
-        rem_outcome  = remediation_outcomes[i]
-        exp_outcome  = explanation_outcomes[i]
+        sev_outcome = severity_outcomes[i]
+        rem_outcome = remediation_outcomes[i]
+        exp_outcome = explanation_outcomes[i]
 
         finding_error: str | None = None
-        sev_result:   SeverityResult    | None = None
-        rem_result:   RemediationResult | None = None
-        explanation:  str | None = None
+        sev_result: SeverityResult | None = None
+        rem_result: RemediationResult | None = None
+        explanation: str | None = None
 
         if isinstance(sev_outcome, Exception):
             finding_error = f"Severity classification failed: {sev_outcome}"
@@ -270,10 +270,10 @@ async def batch_analyze(request: BatchRequest) -> BatchResponse:
 
     fp_candidates = [
         {
-            "rule_id":      r.rule_id,
-            "file_path":    r.file_path,
-            "line_number":  r.line_number,
-            "description":  vulnerabilities[i].description,
+            "rule_id": r.rule_id,
+            "file_path": r.file_path,
+            "line_number": r.line_number,
+            "description": vulnerabilities[i].description,
             "code_snippet": vulnerabilities[i].code_snippet,
         }
         for i, r in enumerate(results)
@@ -285,9 +285,7 @@ async def batch_analyze(request: BatchRequest) -> BatchResponse:
         try:
             triaged = await analyzer.reduce_false_positives(fp_candidates)
             high_fp_rule_ids = [
-                t["rule_id"]
-                for t in triaged
-                if t.get("is_false_positive") and float(t.get("fp_confidence", 0)) >= 0.75
+                t["rule_id"] for t in triaged if t.get("is_false_positive") and float(t.get("fp_confidence", 0)) >= 0.75
             ]
         except Exception as exc:
             logger.warning("False-positive triage failed: %s", exc)

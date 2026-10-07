@@ -12,6 +12,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional
 
+from app.database import Base
+from app.enums import ScanStatus, Severity
 from sqlalchemy import (
     BigInteger,
     DateTime,
@@ -23,9 +25,6 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.database import Base
-from app.enums import ScanStatus, Severity
 
 
 # ---------------------------------------------------------------------------
@@ -49,9 +48,7 @@ class Scan(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
-    completed_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     total_files: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     total_vulnerabilities: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Celery task id for status tracking / cancellation
@@ -61,9 +58,7 @@ class Scan(Base):
     vulnerabilities: Mapped[List["Vulnerability"]] = relationship(
         "Vulnerability", back_populates="scan", cascade="all, delete-orphan"
     )
-    files: Mapped[List["ScanFile"]] = relationship(
-        "ScanFile", back_populates="scan", cascade="all, delete-orphan"
-    )
+    files: Mapped[List["ScanFile"]] = relationship("ScanFile", back_populates="scan", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Scan id={self.id} status={self.status} repo={self.repository_url!r}>"
@@ -109,18 +104,13 @@ class Vulnerability(Base):
     suppressed: Mapped[bool] = mapped_column(nullable=False, default=False, index=True)
     suppressed_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     scan: Mapped["Scan"] = relationship("Scan", back_populates="vulnerabilities")
 
     def __repr__(self) -> str:
-        return (
-            f"<Vulnerability id={self.id} rule={self.rule_id} "
-            f"severity={self.severity} file={self.file_path!r}>"
-        )
+        return f"<Vulnerability id={self.id} rule={self.rule_id} " f"severity={self.severity} file={self.file_path!r}>"
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +134,4 @@ class ScanFile(Base):
     scan: Mapped["Scan"] = relationship("Scan", back_populates="files")
 
     def __repr__(self) -> str:
-        return (
-            f"<ScanFile id={self.id} scan_id={self.scan_id} file={self.file_path!r}>"
-        )
+        return f"<ScanFile id={self.id} scan_id={self.scan_id} file={self.file_path!r}>"

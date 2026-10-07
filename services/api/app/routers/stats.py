@@ -18,12 +18,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, cast, func, select, text
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.database import get_db
-from app.models import Scan, ScanStatus, Severity, ScanFile, Vulnerability
+from app.models import Scan, ScanStatus, Severity, Vulnerability
 from app.schemas import (
     ByRuleResponse,
     RuleGroup,
@@ -35,6 +31,9 @@ from app.schemas import (
     TrendDataPoint,
     TrendsResponse,
 )
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -51,10 +50,10 @@ _SEVERITY_ORDER = [
 # Dashboard colour palette (matches common security tooling conventions)
 _SEVERITY_COLORS: Dict[str, str] = {
     Severity.CRITICAL: "#dc2626",  # red-600
-    Severity.HIGH: "#ea580c",      # orange-600
-    Severity.MEDIUM: "#d97706",    # amber-600
-    Severity.LOW: "#2563eb",       # blue-600
-    Severity.INFO: "#6b7280",      # gray-500
+    Severity.HIGH: "#ea580c",  # orange-600
+    Severity.MEDIUM: "#d97706",  # amber-600
+    Severity.LOW: "#2563eb",  # blue-600
+    Severity.INFO: "#6b7280",  # gray-500
 }
 
 
@@ -69,10 +68,7 @@ _SEVERITY_COLORS: Dict[str, str] = {
 )
 async def summary(db: AsyncSession = Depends(get_db)) -> SummaryResponse:
     # Scan counts
-    scan_counts_result = await db.execute(
-        select(Scan.status, func.count(Scan.id).label("cnt"))
-        .group_by(Scan.status)
-    )
+    scan_counts_result = await db.execute(select(Scan.status, func.count(Scan.id).label("cnt")).group_by(Scan.status))
     scan_counts: Dict[str, int] = {row.status: row.cnt for row in scan_counts_result}
 
     total_scans = sum(scan_counts.values())
@@ -92,16 +88,11 @@ async def summary(db: AsyncSession = Depends(get_db)) -> SummaryResponse:
         .group_by(Vulnerability.severity)
     )
     sev_map: Dict[str, int] = {row.severity: row.cnt for row in sev_result}
-    severity_breakdown = [
-        SeverityCount(severity=sev, count=sev_map.get(sev, 0))
-        for sev in _SEVERITY_ORDER
-    ]
+    severity_breakdown = [SeverityCount(severity=sev, count=sev_map.get(sev, 0)) for sev in _SEVERITY_ORDER]
 
     files_analyzed = (await db.execute(select(func.coalesce(func.sum(Scan.total_files), 0)))).scalar_one()
     week_ago = datetime.now(tz=timezone.utc) - timedelta(days=7)
-    scans_this_week = (
-        await db.execute(select(func.count(Scan.id)).where(Scan.created_at >= week_ago))
-    ).scalar_one()
+    scans_this_week = (await db.execute(select(func.count(Scan.id)).where(Scan.created_at >= week_ago))).scalar_one()
 
     return SummaryResponse(
         total_scans=total_scans,
@@ -235,10 +226,7 @@ async def by_rule(db: AsyncSession = Depends(get_db)) -> ByRuleResponse:
                 rule_id=data["rule_id"],
                 rule_name=data["rule_name"],
                 count=data["count"],
-                severities=[
-                    SeverityCount(severity=s, count=c)
-                    for s, c in data["severities"].items()
-                ],
+                severities=[SeverityCount(severity=s, count=c) for s, c in data["severities"].items()],
             )
         )
 

@@ -26,6 +26,10 @@ Na primeira inicialização, o Compose baixa o modelo Ollama configurado (`llama
 - **API:** `http://localhost:8000/docs`
 - **Dashboard:** `http://localhost:3000`
 
+Em implantações com o dashboard em outra origem, configure `CORS_ORIGINS` como uma lista JSON,
+por exemplo `["https://dashboard.example.com"]`. Por padrão, a API permite apenas as origens
+locais usadas no desenvolvimento.
+
 ## Como Iniciar um Scan
 Via API REST:
 ```bash

@@ -15,7 +15,16 @@ def _dotted(node: ast.AST) -> Optional[str]:
 
 class TaintAnalyzer:
     SOURCES = {"request.args", "request.form", "request.json", "input", "sys.argv", "os.environ"}
-    SINKS = {"cursor.execute", "os.system", "subprocess.run", "subprocess.Popen", "eval", "exec", "open", "render_template"}
+    SINKS = {
+        "cursor.execute",
+        "os.system",
+        "subprocess.run",
+        "subprocess.Popen",
+        "eval",
+        "exec",
+        "open",
+        "render_template",
+    }
     SANITIZERS = {"escape", "quote", "sanitize", "validate", "int", "float"}
 
     def analyze(self, ast_data: dict, source_code: str) -> List[Dict[str, Any]]:
@@ -43,13 +52,15 @@ class TaintAnalyzer:
                     states = [self._state(a, tainted) for a in node.args]
                     states = [s for s in states if s is not None]
                     if states:
-                        flows.append({
-                            "source": "Untrusted Input",
-                            "sink": _dotted(node.func),
-                            "path": [source.lineno, node.lineno],
-                            "is_sanitized": all(states),
-                            "variable": var,
-                        })
+                        flows.append(
+                            {
+                                "source": "Untrusted Input",
+                                "sink": _dotted(node.func),
+                                "path": [source.lineno, node.lineno],
+                                "is_sanitized": all(states),
+                                "variable": var,
+                            }
+                        )
         return flows
 
     def _sources(self, nodes: List[ast.AST]) -> Dict[str, ast.Assign]:

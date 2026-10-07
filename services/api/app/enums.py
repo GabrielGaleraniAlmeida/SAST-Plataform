@@ -10,6 +10,7 @@ import enum
 
 class ScanStatus(str, enum.Enum):
     """Lifecycle states of a scan job."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -19,6 +20,7 @@ class ScanStatus(str, enum.Enum):
 
 class Severity(str, enum.Enum):
     """CVSS-inspired severity levels."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"

@@ -7,22 +7,19 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 import httpx
-from celery import Celery
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from app.config import settings
 from app.enums import ScanStatus, Severity
 from app.models import Scan, ScanFile, Vulnerability
+from celery import Celery
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
 
 celery_app = Celery("sast_tasks", broker=settings.REDIS_URL, backend=settings.REDIS_URL)
 celery_app.conf.update(task_track_started=True, task_acks_late=True, worker_prefetch_multiplier=1)
 
-_engine = create_engine(
-    settings.DATABASE_URL.replace("+asyncpg", "+psycopg2"), pool_pre_ping=True
-)
+_engine = create_engine(settings.DATABASE_URL.replace("+asyncpg", "+psycopg2"), pool_pre_ping=True)
 SyncSession = sessionmaker(bind=_engine, expire_on_commit=False)
 
 AI_BATCH_SIZE = 10
@@ -32,7 +29,7 @@ FALSE_POSITIVE_MIN_CONFIDENCE = 0.75
 def _enrich_with_ai(findings: List[Dict[str, Any]]) -> None:
     """Best-effort: AI severity, false-positive triage and remediation (in place)."""
     for start in range(0, len(findings), AI_BATCH_SIZE):
-        chunk = findings[start:start + AI_BATCH_SIZE]
+        chunk = findings[start : start + AI_BATCH_SIZE]
         payload = {
             "vulnerabilities": [
                 {
@@ -51,9 +48,7 @@ def _enrich_with_ai(findings: List[Dict[str, Any]]) -> None:
             "include_remediation": True,
         }
         try:
-            resp = httpx.post(
-                f"{settings.AI_URL}/ai/batch-analyze", json=payload, timeout=settings.AI_TIMEOUT
-            )
+            resp = httpx.post(f"{settings.AI_URL}/ai/batch-analyze", json=payload, timeout=settings.AI_TIMEOUT)
             resp.raise_for_status()
             results = resp.json()["results"]
         except Exception as exc:
@@ -99,24 +94,26 @@ def run_scan(self, scan_id: int) -> Dict[str, Any]:
                     severity = Severity(f.get("severity", "info"))
                 except ValueError:
                     severity = Severity.INFO
-                db.add(Vulnerability(
-                    scan_id=scan_id,
-                    file_path=f["file_path"],
-                    line_number=max(int(f.get("line_number") or 1), 1),
-                    column=f.get("column"),
-                    rule_id=f["rule_id"],
-                    rule_name=f["rule_name"],
-                    severity=severity,
-                    cwe_id=f.get("cwe_id"),
-                    title=f.get("title") or f["rule_name"],
-                    description=f.get("description"),
-                    code_snippet=f.get("code_snippet"),
-                    ai_suggestion=f.get("ai_suggestion"),
-                    ai_severity=f.get("ai_severity"),
-                    confidence=f.get("confidence"),
-                    suppressed=f.get("suppressed", False),
-                    suppressed_reason=f.get("suppressed_reason"),
-                ))
+                db.add(
+                    Vulnerability(
+                        scan_id=scan_id,
+                        file_path=f["file_path"],
+                        line_number=max(int(f.get("line_number") or 1), 1),
+                        column=f.get("column"),
+                        rule_id=f["rule_id"],
+                        rule_name=f["rule_name"],
+                        severity=severity,
+                        cwe_id=f.get("cwe_id"),
+                        title=f.get("title") or f["rule_name"],
+                        description=f.get("description"),
+                        code_snippet=f.get("code_snippet"),
+                        ai_suggestion=f.get("ai_suggestion"),
+                        ai_severity=f.get("ai_severity"),
+                        confidence=f.get("confidence"),
+                        suppressed=f.get("suppressed", False),
+                        suppressed_reason=f.get("suppressed_reason"),
+                    )
+                )
             db.add_all(ScanFile(scan_id=scan_id, **file) for file in result["files"])
 
             scan.total_files = result["total_files"]

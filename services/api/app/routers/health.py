@@ -12,13 +12,12 @@ from __future__ import annotations
 import logging
 
 import redis as sync_redis
-from fastapi import APIRouter, status
-from fastapi.responses import JSONResponse
-from sqlalchemy import text
-
 from app.config import settings
 from app.database import AsyncSessionLocal
 from app.schemas import HealthResponse
+from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

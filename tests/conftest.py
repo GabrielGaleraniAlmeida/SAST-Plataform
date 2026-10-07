@@ -1,6 +1,7 @@
-import pytest
 import ast
-from unittest.mock import Mock
+
+import pytest
+
 
 @pytest.fixture
 def sample_python_code():
@@ -15,17 +16,18 @@ def get_user():
     # Vulnerability: SQL Injection
     cursor = sqlite3.connect('db.sqlite').cursor()
     cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
-    
+
 def execute_cmd():
     cmd = request.form.get('cmd')
     # Vulnerability: Command Injection
     os.system(cmd)
-    
+
 def hardcoded_secrets():
     # Vulnerability: Hardcoded Password
     api_key = "AKIA1234567890ABCDEF"
     db_password = "super_secret_admin_password"
     """
+
 
 @pytest.fixture
 def mock_ast_data(sample_python_code):

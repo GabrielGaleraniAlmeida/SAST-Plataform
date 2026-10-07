@@ -13,10 +13,6 @@ import logging
 import math
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.database import get_db
 from app.models import Severity, Vulnerability
 from app.schemas import (
@@ -24,6 +20,9 @@ from app.schemas import (
     VulnerabilityResponse,
     VulnerabilitySuppressRequest,
 )
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -33,9 +32,7 @@ router = APIRouter()
 # Helper
 # ---------------------------------------------------------------------------
 async def _get_vuln_or_404(vuln_id: int, db: AsyncSession) -> Vulnerability:
-    result = await db.execute(
-        select(Vulnerability).where(Vulnerability.id == vuln_id)
-    )
+    result = await db.execute(select(Vulnerability).where(Vulnerability.id == vuln_id))
     vuln = result.scalar_one_or_none()
     if vuln is None:
         raise HTTPException(
@@ -81,15 +78,11 @@ async def list_vulnerabilities(
         query = query.where(Vulnerability.suppressed == suppressed)
 
     # Count
-    count_result = await db.execute(
-        select(func.count()).select_from(query.subquery())
-    )
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = count_result.scalar_one()
 
     # Data
-    query = query.order_by(
-        Vulnerability.severity.desc(), Vulnerability.created_at.desc()
-    )
+    query = query.order_by(Vulnerability.severity.desc(), Vulnerability.created_at.desc())
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
     vulns = result.scalars().all()

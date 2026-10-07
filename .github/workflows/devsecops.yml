@@ -60,18 +60,17 @@ jobs:
         run: |
           mkdir -p reports/bandit
           bandit -r . \
-            --configfile .bandit \
+            --ini .bandit \
             --format json \
             --output reports/bandit/results.json \
             --exclude './.venv,./venv,./node_modules,./sample_targets' \
             --severity-level medium \
             --confidence-level medium \
-            -ll \
             || true  # Don't fail here; gate job decides
 
           # Also generate human-readable output
           bandit -r . \
-            --configfile .bandit \
+            --ini .bandit \
             --format txt \
             --output reports/bandit/results.txt \
             --exclude './.venv,./venv,./node_modules,./sample_targets' \
@@ -93,12 +92,12 @@ jobs:
             --config p/security-audit \
             --config p/owasp-top-ten \
             --json \
-            --output reports/semgrep/results.json \
             --exclude 'sample_targets/**' \
             --exclude 'venv/**' \
             --exclude '.venv/**' \
-            . \
-            || true
+            . > reports/semgrep/results.json
+
+          python -m json.tool reports/semgrep/results.json > /dev/null
 
           # Human readable summary
           semgrep \
@@ -293,6 +292,9 @@ jobs:
             docker pull python:3.11-slim
             docker tag python:3.11-slim sast-platform:scan
           fi
+
+      - name: Prepare Trivy report directory
+        run: mkdir -p reports/trivy
 
       - name: Run Trivy – vulnerability scan
         uses: aquasecurity/trivy-action@master

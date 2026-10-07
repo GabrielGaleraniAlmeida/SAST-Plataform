@@ -10,7 +10,6 @@ Async HTTP wrapper around the Ollama REST API with:
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import time
@@ -20,9 +19,9 @@ import httpx
 from tenacity import (
     AsyncRetrying,
     RetryError,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,9 +31,9 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 _DEFAULT_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
-_DEFAULT_MODEL    = os.getenv("OLLAMA_MODEL", "llama3")
-_REQUEST_TIMEOUT  = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
-_MAX_RETRIES      = int(os.getenv("OLLAMA_MAX_RETRIES", "3"))
+_DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "llama3")
+_REQUEST_TIMEOUT = float(os.getenv("OLLAMA_TIMEOUT_SECONDS", "120"))
+_MAX_RETRIES = int(os.getenv("OLLAMA_MAX_RETRIES", "3"))
 
 # Fallback text returned when Ollama is completely unreachable
 _OLLAMA_UNAVAILABLE_FALLBACK = (
@@ -46,6 +45,7 @@ _OLLAMA_UNAVAILABLE_FALLBACK = (
 # ---------------------------------------------------------------------------
 # Ollama Client
 # ---------------------------------------------------------------------------
+
 
 class OllamaClient:
     """
@@ -66,11 +66,9 @@ class OllamaClient:
         model: str = _DEFAULT_MODEL,
     ) -> None:
         self.base_url = base_url.rstrip("/")
-        self.model    = model
-        self._generation_semaphore = asyncio.Semaphore(
-            max(1, int(os.getenv("OLLAMA_MAX_CONCURRENCY", "2")))
-        )
-        self._client  = httpx.AsyncClient(
+        self.model = model
+        self._generation_semaphore = asyncio.Semaphore(max(1, int(os.getenv("OLLAMA_MAX_CONCURRENCY", "2"))))
+        self._client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=httpx.Timeout(
                 connect=10.0,
@@ -116,9 +114,7 @@ class OllamaClient:
             async for attempt in AsyncRetrying(
                 stop=stop_after_attempt(_MAX_RETRIES),
                 wait=wait_exponential(multiplier=1, min=2, max=10),
-                retry=retry_if_exception_type(
-                    (httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError)
-                ),
+                retry=retry_if_exception_type((httpx.ConnectError, httpx.TimeoutException, httpx.RemoteProtocolError)),
                 reraise=False,
             ):
                 with attempt:
@@ -206,10 +202,7 @@ class OllamaClient:
         str: The rendered prompt.
         """
         # Replace None values with "N/A" to avoid 'None' appearing in prompts
-        safe_kwargs = {
-            k: (v if v is not None else "N/A")
-            for k, v in kwargs.items()
-        }
+        safe_kwargs = {k: (v if v is not None else "N/A") for k, v in kwargs.items()}
         try:
             return template.format(**safe_kwargs)
         except KeyError as exc:

@@ -6,7 +6,6 @@ import tempfile
 from typing import Any, Dict, List
 
 import git
-
 from app.engine.parser import ASTParser
 from app.engine.rules import RulesEngine
 from app.engine.taint_analysis import TaintAnalyzer
@@ -61,34 +60,35 @@ class SASTScanner:
                 rel = os.path.relpath(path, directory).replace(os.sep, "/")
                 found = self.scan_snippet(code, lang, rel)
                 vulnerabilities.extend(found)
-                files.append({
-                    "file_path": rel,
-                    "language": lang,
-                    "lines_of_code": code.count("\n") + 1,
-                    "vulnerabilities_count": len(found),
-                })
+                files.append(
+                    {
+                        "file_path": rel,
+                        "language": lang,
+                        "lines_of_code": code.count("\n") + 1,
+                        "vulnerabilities_count": len(found),
+                    }
+                )
         return {"vulnerabilities": vulnerabilities, "files": files, "total_files": len(files)}
 
     def scan_snippet(self, code: str, language: str, filename: str = "snippet.py") -> List[Dict[str, Any]]:
         ast_data = self.parser.parse_code(code, language)
-        findings = [
-            _flat(f, filename)
-            for f in self.rules_engine.check_all(ast_data, code, language, filename)
-        ]
+        findings = [_flat(f, filename) for f in self.rules_engine.check_all(ast_data, code, language, filename)]
         if language == "python":
             for flow in self.taint_analyzer.analyze(ast_data, code):
                 if flow["is_sanitized"]:
                     continue
-                findings.append({
-                    "file_path": filename,
-                    "line_number": flow["path"][-1],
-                    "rule_id": "SAST-TAINT-001",
-                    "rule_name": "Fluxo de Dados Não Sanitizado",
-                    "severity": "critical",
-                    "cwe_id": "CWE-20",
-                    "title": f"Tainted flow to {flow['sink']}",
-                    "description": f"Input inseguro atinge a função '{flow['sink']}' sem sanitização prévia.",
-                    "code_snippet": f"{flow['variable']} -> {flow['sink']}()",
-                    "language": language,
-                })
+                findings.append(
+                    {
+                        "file_path": filename,
+                        "line_number": flow["path"][-1],
+                        "rule_id": "SAST-TAINT-001",
+                        "rule_name": "Fluxo de Dados Não Sanitizado",
+                        "severity": "critical",
+                        "cwe_id": "CWE-20",
+                        "title": f"Tainted flow to {flow['sink']}",
+                        "description": f"Input inseguro atinge a função '{flow['sink']}' sem sanitização prévia.",
+                        "code_snippet": f"{flow['variable']} -> {flow['sink']}()",
+                        "language": language,
+                    }
+                )
         return findings

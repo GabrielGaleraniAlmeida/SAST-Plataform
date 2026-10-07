@@ -48,6 +48,7 @@ jobs:
             --count \
             --max-line-length 120 \
             --extend-ignore E203,W503 \
+            --extend-immutable-calls=Depends,Query \
             --exclude venv,.venv,__pycache__,migrations,sample_targets \
             --statistics \
             --format '%(path)s:%(row)d:%(col)d: %(code)s %(text)s'

@@ -5,10 +5,9 @@ import logging
 from contextlib import asynccontextmanager
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
-
 from app.engine.scanner import SASTScanner
 from app.models import AnalysisRequest
+from fastapi import FastAPI, HTTPException
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)

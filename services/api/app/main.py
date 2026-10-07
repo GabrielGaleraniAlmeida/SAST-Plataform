@@ -14,13 +14,12 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
+from app.config import settings
+from app.database import Base, engine
+from app.routers import health, scans, stats, vulnerabilities
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-
-from app.config import settings
-from app.database import engine, Base
-from app.routers import scans, vulnerabilities, stats, health
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -73,10 +72,9 @@ def create_application() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=settings.CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -86,9 +84,7 @@ def create_application() -> FastAPI:
     api_prefix = "/api/v1"
     application.include_router(health.router, prefix=api_prefix, tags=["Health"])
     application.include_router(scans.router, prefix=api_prefix, tags=["Scans"])
-    application.include_router(
-        vulnerabilities.router, prefix=api_prefix, tags=["Vulnerabilities"]
-    )
+    application.include_router(vulnerabilities.router, prefix=api_prefix, tags=["Vulnerabilities"])
     application.include_router(stats.router, prefix=api_prefix, tags=["Statistics"])
 
     return application

@@ -33,9 +33,7 @@ def test_health_check_reports_missing_model_as_unavailable():
         await client.close()
         client._client = httpx.AsyncClient(
             base_url=client.base_url,
-            transport=httpx.MockTransport(
-                lambda request: httpx.Response(200, json={"models": []})
-            ),
+            transport=httpx.MockTransport(lambda request: httpx.Response(200, json={"models": []})),
         )
         try:
             assert not await client.health_check()
@@ -57,8 +55,7 @@ def test_generate_uses_ollama_generate_endpoint_and_returns_suggestion():
                         200,
                         json={"response": "Use a parameterized query."},
                     )
-                    if request.url.path == "/api/generate"
-                    and json.loads(request.content)["model"] == "llama3"
+                    if request.url.path == "/api/generate" and json.loads(request.content)["model"] == "llama3"
                     else httpx.Response(404)
                 )
             ),

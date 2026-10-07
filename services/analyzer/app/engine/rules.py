@@ -287,9 +287,7 @@ RULE_SAST010 = SecurityRule(
     severity=SeverityLevel.MEDIUM,
     cwe_id="CWE-319",
     languages=["python", "javascript", "java"],
-    remediation=(
-        "Replace all http:// URLs with https://. Enforce HSTS headers on server responses."
-    ),
+    remediation=("Replace all http:// URLs with https://. Enforce HSTS headers on server responses."),
     references=[
         "https://cwe.mitre.org/data/definitions/319.html",
         "https://owasp.org/www-community/vulnerabilities/Cleartext_Transmission_of_Sensitive_Information",
@@ -404,16 +402,28 @@ RULE_SAST015 = SecurityRule(
 )
 
 ALL_RULES: List[SecurityRule] = [
-    RULE_SAST001, RULE_SAST002, RULE_SAST003, RULE_SAST004,
-    RULE_SAST005, RULE_SAST006, RULE_SAST007, RULE_SAST008,
-    RULE_SAST009, RULE_SAST010, RULE_SAST011, RULE_SAST012,
-    RULE_SAST013, RULE_SAST014, RULE_SAST015,
+    RULE_SAST001,
+    RULE_SAST002,
+    RULE_SAST003,
+    RULE_SAST004,
+    RULE_SAST005,
+    RULE_SAST006,
+    RULE_SAST007,
+    RULE_SAST008,
+    RULE_SAST009,
+    RULE_SAST010,
+    RULE_SAST011,
+    RULE_SAST012,
+    RULE_SAST013,
+    RULE_SAST014,
+    RULE_SAST015,
 ]
 
 
 # ---------------------------------------------------------------------------
 # Detection Logic
 # ---------------------------------------------------------------------------
+
 
 class RulesEngine:
     """
@@ -464,7 +474,9 @@ class RulesEngine:
     # SAST-003: Command injection patterns
     _CMD_INJECT_PATTERNS = [
         re.compile(r"""os\.system\s*\(""", re.IGNORECASE),
-        re.compile(r"""subprocess\.(run|Popen|call|check_output)\s*\([^)]*shell\s*=\s*True""", re.IGNORECASE | re.DOTALL),
+        re.compile(
+            r"""subprocess\.(run|Popen|call|check_output)\s*\([^)]*shell\s*=\s*True""", re.IGNORECASE | re.DOTALL
+        ),
         re.compile(r"""\beval\s*\(""", re.IGNORECASE),
         re.compile(r"""\bexec\s*\(""", re.IGNORECASE),
     ]
@@ -519,7 +531,8 @@ class RulesEngine:
 
     # SAST-010: HTTP (not HTTPS)
     _HTTP_URL_PATTERN = re.compile(
-        r"""(?:requests\.|httpx\.|urllib|fetch\(|axios\.)\s*(?:get|post|put|delete|patch|request)?\s*\([^)]*http://(?!localhost)""",
+        r"""(?:requests\.|httpx\.|urllib|fetch\(|axios\.)\s*"""
+        r"""(?:get|post|put|delete|patch|request)?\s*\([^)]*http://(?!localhost)""",
         re.IGNORECASE,
     )
     _BARE_HTTP_PATTERN = re.compile(
@@ -543,7 +556,9 @@ class RulesEngine:
         re.compile(r"""httpx\.\w+\s*\(\s*(?:url|request\.|args\.|form\.)""", re.IGNORECASE),
         re.compile(r"""urllib\.request\.urlopen\s*\(\s*(?:url|request\.|args\.)""", re.IGNORECASE),
         # Variables commonly used for untrusted URLs; validated/configured URLs are not enough evidence.
-        re.compile(r"""requests\.\w+\s*\(\s*(?:user|request|input|target|redirect|callback)_url\s*[,)]""", re.IGNORECASE),
+        re.compile(
+            r"""requests\.\w+\s*\(\s*(?:user|request|input|target|redirect|callback)_url\s*[,)]""", re.IGNORECASE
+        ),
         re.compile(r"""requests\.\w+\s*\(\s*target\s*[,)]""", re.IGNORECASE),
     ]
 
@@ -564,7 +579,8 @@ class RulesEngine:
     )
     # Auth decorators - if present, route IS protected
     _AUTH_DECORATORS = re.compile(
-        r"""@(?:login_required|jwt_required|requires_auth|authenticate|token_required|permission_required|staff_member_required|superuser_required)\b""",
+        r"""@(?:login_required|jwt_required|requires_auth|authenticate|token_required|permission_required|"""
+        r"""staff_member_required|superuser_required)\b""",
         re.IGNORECASE,
     )
     _SENSITIVE_ROUTE_NAMES = re.compile(
@@ -662,11 +678,18 @@ class RulesEngine:
             lineno = source_code[:start_pos].count("\n") + 1
             snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
 
-            findings.append(_make_finding(
-                RULE_SAST001, language, filename, lineno, lineno,
-                snippet, confidence=0.80,
-                metadata={"matched_value_length": len(value)},
-            ))
+            findings.append(
+                _make_finding(
+                    RULE_SAST001,
+                    language,
+                    filename,
+                    lineno,
+                    lineno,
+                    snippet,
+                    confidence=0.80,
+                    metadata={"matched_value_length": len(value)},
+                )
+            )
 
         # Method 2: AST-based (Python only) - look for string assignments to sensitive names
         if language == "python":
@@ -682,11 +705,18 @@ class RulesEngine:
                         # Avoid duplicate with regex match
                         lineno = node.get("lineno", 0)
                         snippet = node.get("snippet", "")
-                        findings.append(_make_finding(
-                            RULE_SAST001, language, filename, lineno, lineno,
-                            snippet, confidence=0.90,
-                            metadata={"variable": target},
-                        ))
+                        findings.append(
+                            _make_finding(
+                                RULE_SAST001,
+                                language,
+                                filename,
+                                lineno,
+                                lineno,
+                                snippet,
+                                confidence=0.90,
+                                metadata={"variable": target},
+                            )
+                        )
 
         return self._deduplicate(findings)
 
@@ -718,10 +748,7 @@ class RulesEngine:
 
                 dynamic_query = (
                     isinstance(query, ast.JoinedStr)
-                    or (
-                        isinstance(query, ast.BinOp)
-                        and isinstance(query.op, (ast.Add, ast.Mod))
-                    )
+                    or (isinstance(query, ast.BinOp) and isinstance(query.op, (ast.Add, ast.Mod)))
                     or (
                         isinstance(query, ast.Call)
                         and isinstance(query.func, ast.Attribute)
@@ -731,19 +758,33 @@ class RulesEngine:
                 if dynamic_query:
                     lineno = node.lineno
                     snippet = lines[lineno - 1] if lineno <= len(lines) else query_text
-                    findings.append(_make_finding(
-                        RULE_SAST002, language, filename, lineno, lineno,
-                        snippet, confidence=0.92,
-                        metadata={"func": "execute", "arg": query_text},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST002,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.92,
+                            metadata={"func": "execute", "arg": query_text},
+                        )
+                    )
         else:
             for match in self._SQL_INJECT_EXECUTE_PATTERN.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
-                findings.append(_make_finding(
-                    RULE_SAST002, language, filename, lineno, lineno, snippet,
-                    confidence=0.85,
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST002,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.85,
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -766,41 +807,50 @@ class RulesEngine:
                 func_name = ast.unparse(node.func)
                 is_os_system = func_name == "os.system"
                 is_dynamic_eval = isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec")
-                is_shell_subprocess = (
-                    func_name in {
-                        "subprocess.run",
-                        "subprocess.Popen",
-                        "subprocess.call",
-                        "subprocess.check_output",
-                    }
-                    and any(
-                        keyword.arg == "shell"
-                        and isinstance(keyword.value, ast.Constant)
-                        and keyword.value.value is True
-                        for keyword in node.keywords
-                    )
+                is_shell_subprocess = func_name in {
+                    "subprocess.run",
+                    "subprocess.Popen",
+                    "subprocess.call",
+                    "subprocess.check_output",
+                } and any(
+                    keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True
+                    for keyword in node.keywords
                 )
                 if not (is_os_system or is_dynamic_eval or is_shell_subprocess):
                     continue
 
                 lineno = node.lineno
                 snippet = lines[lineno - 1] if lineno <= len(lines) else func_name
-                findings.append(_make_finding(
-                    RULE_SAST003, language, filename, lineno, lineno, snippet,
-                    confidence=0.90 if is_os_system or is_shell_subprocess else 0.75,
-                    metadata={"matched": func_name, "shell": is_shell_subprocess},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST003,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.90 if is_os_system or is_shell_subprocess else 0.75,
+                        metadata={"matched": func_name, "shell": is_shell_subprocess},
+                    )
+                )
         else:
             for pattern in self._CMD_INJECT_PATTERNS:
                 for match in pattern.finditer(source_code):
-                    lineno = source_code[:match.start()].count("\n") + 1
+                    lineno = source_code[: match.start()].count("\n") + 1
                     snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
                     matched_text = match.group().strip()
-                    findings.append(_make_finding(
-                        RULE_SAST003, language, filename, lineno, lineno, snippet,
-                        confidence=0.75 if matched_text.startswith(("eval", "exec")) else 0.90,
-                        metadata={"matched": matched_text},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST003,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.75 if matched_text.startswith(("eval", "exec")) else 0.90,
+                            metadata={"matched": matched_text},
+                        )
+                    )
 
         return self._deduplicate(findings)
 
@@ -813,13 +863,20 @@ class RulesEngine:
 
         for pattern in self._PATH_TRAVERSAL_PATTERNS:
             for match in pattern.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
-                findings.append(_make_finding(
-                    RULE_SAST004, language, filename, lineno, lineno, snippet,
-                    confidence=0.80,
-                    metadata={"matched": match.group()[:80]},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST004,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.80,
+                        metadata={"matched": match.group()[:80]},
+                    )
+                )
 
         # AST: open() or os.path.join() calls with non-constant first arg
         if language == "python":
@@ -835,11 +892,18 @@ class RulesEngine:
                 if first_arg and not first_arg.startswith(("'", '"')):
                     lineno = node.get("lineno", 0)
                     snippet = node.get("snippet", "")
-                    findings.append(_make_finding(
-                        RULE_SAST004, language, filename, lineno, lineno,
-                        snippet, confidence=0.70,
-                        metadata={"func": func, "path_arg": first_arg},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST004,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.70,
+                            metadata={"func": func, "path_arg": first_arg},
+                        )
+                    )
 
         return self._deduplicate(findings)
 
@@ -868,11 +932,18 @@ class RulesEngine:
                         continue
                     lineno = node.lineno
                     snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
-                    findings.append(_make_finding(
-                        RULE_SAST005, language, filename, lineno, lineno, snippet,
-                        confidence=0.75,
-                        metadata={"ip": str(address)},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST005,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.75,
+                            metadata={"ip": str(address)},
+                        )
+                    )
         else:
             for match in self._IP_PATTERN.finditer(source_code):
                 try:
@@ -881,15 +952,22 @@ class RulesEngine:
                     continue
                 if not address.is_global:
                     continue
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
                 if snippet.strip().startswith(("#", "//")):
                     continue
-                findings.append(_make_finding(
-                    RULE_SAST005, language, filename, lineno, lineno, snippet,
-                    confidence=0.75,
-                    metadata={"ip": str(address)},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST005,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.75,
+                        metadata={"ip": str(address)},
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -907,29 +985,41 @@ class RulesEngine:
                 return findings
             for node in ast.walk(parsed):
                 if not (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Name)
-                    and node.func.id in ("eval", "exec")
+                    isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in ("eval", "exec")
                 ):
                     continue
                 lineno = node.lineno
                 snippet = lines[lineno - 1] if lineno <= len(lines) else node.func.id
-                findings.append(_make_finding(
-                    RULE_SAST006, language, filename, lineno, lineno, snippet,
-                    confidence=0.85,
-                    metadata={"call": node.func.id},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST006,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.85,
+                        metadata={"call": node.func.id},
+                    )
+                )
         else:
             for match in self._EVAL_EXEC_PATTERN.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
                 if snippet.strip().startswith(("#", "//")):
                     continue
-                findings.append(_make_finding(
-                    RULE_SAST006, language, filename, lineno, lineno, snippet,
-                    confidence=0.85,
-                    metadata={"call": match.group()},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST006,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.85,
+                        metadata={"call": match.group()},
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -942,13 +1032,20 @@ class RulesEngine:
 
         for pattern in self._WEAK_CRYPTO_PATTERNS:
             for match in pattern.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
-                findings.append(_make_finding(
-                    RULE_SAST007, language, filename, lineno, lineno, snippet,
-                    confidence=0.90,
-                    metadata={"matched": match.group()},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST007,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.90,
+                        metadata={"matched": match.group()},
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -962,7 +1059,7 @@ class RulesEngine:
         # Strategy: find random usage AND check if nearby context is security-sensitive
         for pattern in self._INSECURE_RANDOM_PATTERNS:
             for match in pattern.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
 
                 # Check surrounding 5 lines for security-sensitive keywords
@@ -971,18 +1068,32 @@ class RulesEngine:
                 context = "\n".join(lines[ctx_start:ctx_end])
 
                 if self._RANDOM_SENSITIVE_CONTEXT.search(context):
-                    findings.append(_make_finding(
-                        RULE_SAST008, language, filename, lineno, lineno, snippet,
-                        confidence=0.80,
-                        metadata={"matched": match.group()},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST008,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.80,
+                            metadata={"matched": match.group()},
+                        )
+                    )
                 elif "import random" in match.group():
                     # Flag the import with lower confidence
-                    findings.append(_make_finding(
-                        RULE_SAST008, language, filename, lineno, lineno, snippet,
-                        confidence=0.50,
-                        metadata={"matched": match.group(), "note": "import only - verify usage"},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST008,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.50,
+                            metadata={"matched": match.group(), "note": "import only - verify usage"},
+                        )
+                    )
 
         return self._deduplicate(findings)
 
@@ -995,16 +1106,23 @@ class RulesEngine:
 
         for pattern in self._DEBUG_MODE_PATTERNS:
             for match in pattern.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
                 # Skip comment lines
                 if snippet.strip().startswith("#"):
                     continue
-                findings.append(_make_finding(
-                    RULE_SAST009, language, filename, lineno, lineno, snippet,
-                    confidence=0.95,
-                    metadata={"matched": match.group()},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST009,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.95,
+                        metadata={"matched": match.group()},
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -1016,7 +1134,7 @@ class RulesEngine:
         findings = []
 
         for match in self._BARE_HTTP_PATTERN.finditer(source_code):
-            lineno = source_code[:match.start()].count("\n") + 1
+            lineno = source_code[: match.start()].count("\n") + 1
             snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
             # Skip comment lines
             if snippet.strip().startswith(("#", "//")):
@@ -1024,11 +1142,18 @@ class RulesEngine:
             # Skip test fixtures / docs
             if re.search(r"(?:test|example|docs|README)", filename, re.I):
                 continue
-            findings.append(_make_finding(
-                RULE_SAST010, language, filename, lineno, lineno, snippet,
-                confidence=0.75,
-                metadata={"url": match.group(1)[:100]},
-            ))
+            findings.append(
+                _make_finding(
+                    RULE_SAST010,
+                    language,
+                    filename,
+                    lineno,
+                    lineno,
+                    snippet,
+                    confidence=0.75,
+                    metadata={"url": match.group(1)[:100]},
+                )
+            )
 
         return self._deduplicate(findings)
 
@@ -1041,13 +1166,20 @@ class RulesEngine:
 
         for pattern in self._XSS_PATTERNS:
             for match in pattern.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
-                findings.append(_make_finding(
-                    RULE_SAST011, language, filename, lineno, lineno, snippet,
-                    confidence=0.80,
-                    metadata={"matched": match.group()},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST011,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.80,
+                        metadata={"matched": match.group()},
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -1060,13 +1192,20 @@ class RulesEngine:
 
         for pattern in self._SSRF_PATTERNS:
             for match in pattern.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
-                findings.append(_make_finding(
-                    RULE_SAST012, language, filename, lineno, lineno, snippet,
-                    confidence=0.75,
-                    metadata={"matched": match.group()[:80]},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST012,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.75,
+                        metadata={"matched": match.group()[:80]},
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -1079,16 +1218,23 @@ class RulesEngine:
 
         for pattern in self._DESERIAL_PATTERNS:
             for match in pattern.finditer(source_code):
-                lineno = source_code[:match.start()].count("\n") + 1
+                lineno = source_code[: match.start()].count("\n") + 1
                 snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
                 # Skip comment lines
                 if snippet.strip().startswith("#"):
                     continue
-                findings.append(_make_finding(
-                    RULE_SAST013, language, filename, lineno, lineno, snippet,
-                    confidence=0.90,
-                    metadata={"matched": match.group()},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST013,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.90,
+                        metadata={"matched": match.group()},
+                    )
+                )
 
         return self._deduplicate(findings)
 
@@ -1114,23 +1260,33 @@ class RulesEngine:
             func_name = node.get("name", "")
 
             has_route = any(
-                re.search(r"(?:app|router|blueprint)\.(route|get|post|put|delete|patch)", d, re.I)
-                for d in decorators
+                re.search(r"(?:app|router|blueprint)\.(route|get|post|put|delete|patch)", d, re.I) for d in decorators
             )
             has_auth = any(
-                re.search(r"(?:login_required|jwt_required|requires_auth|authenticate|"
-                          r"token_required|permission_required|staff_member_required|"
-                          r"superuser_required|current_user)", d, re.I)
+                re.search(
+                    r"(?:login_required|jwt_required|requires_auth|authenticate|"
+                    r"token_required|permission_required|staff_member_required|"
+                    r"superuser_required|current_user)",
+                    d,
+                    re.I,
+                )
                 for d in decorators
             )
 
             if has_route and not has_auth and self._SENSITIVE_ROUTE_NAMES.search(func_name):
                 snippet = node.get("snippet", lines[lineno - 1] if lineno <= len(lines) else "")
-                findings.append(_make_finding(
-                    RULE_SAST014, language, filename, lineno, lineno,
-                    snippet, confidence=0.85,
-                    metadata={"function": func_name, "decorators": decorators},
-                ))
+                findings.append(
+                    _make_finding(
+                        RULE_SAST014,
+                        language,
+                        filename,
+                        lineno,
+                        lineno,
+                        snippet,
+                        confidence=0.85,
+                        metadata={"function": func_name, "decorators": decorators},
+                    )
+                )
 
         return findings
 
@@ -1156,8 +1312,7 @@ class RulesEngine:
                     continue
                 func_name = ast.unparse(node.func).lower()
                 is_log_call = func_name == "print" or (
-                    func_name.rsplit(".", 1)[-1]
-                    in {"debug", "info", "warning", "error", "exception", "critical"}
+                    func_name.rsplit(".", 1)[-1] in {"debug", "info", "warning", "error", "exception", "critical"}
                     and func_name.startswith(("logger.", "logging.", "log."))
                 )
                 if not is_log_call:
@@ -1171,28 +1326,42 @@ class RulesEngine:
                         elif isinstance(value, ast.Attribute):
                             exposed_names.add(value.attr)
                 sensitive_names = [
-                    name for name in exposed_names
-                    if sensitive_name.search(name)
-                    and not re.search(r"_(?:hash|digest)$", name, re.IGNORECASE)
+                    name
+                    for name in exposed_names
+                    if sensitive_name.search(name) and not re.search(r"_(?:hash|digest)$", name, re.IGNORECASE)
                 ]
                 if sensitive_names:
                     lineno = node.lineno
                     snippet = lines[lineno - 1] if lineno <= len(lines) else func_name
-                    findings.append(_make_finding(
-                        RULE_SAST015, language, filename, lineno, lineno, snippet,
-                        confidence=0.85,
-                        metadata={"sensitive_variables": sorted(sensitive_names)},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST015,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.85,
+                            metadata={"sensitive_variables": sorted(sensitive_names)},
+                        )
+                    )
         else:
             for pattern in self._LOG_SENSITIVE_PATTERNS:
                 for match in pattern.finditer(source_code):
-                    lineno = source_code[:match.start()].count("\n") + 1
+                    lineno = source_code[: match.start()].count("\n") + 1
                     snippet = lines[lineno - 1] if lineno <= len(lines) else match.group()
-                    findings.append(_make_finding(
-                        RULE_SAST015, language, filename, lineno, lineno, snippet,
-                        confidence=0.80,
-                        metadata={"matched": match.group()[:120]},
-                    ))
+                    findings.append(
+                        _make_finding(
+                            RULE_SAST015,
+                            language,
+                            filename,
+                            lineno,
+                            lineno,
+                            snippet,
+                            confidence=0.80,
+                            metadata={"matched": match.group()[:120]},
+                        )
+                    )
 
         return self._deduplicate(findings)
 

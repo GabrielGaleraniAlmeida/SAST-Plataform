@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import ast
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -33,7 +32,7 @@ EXTENSION_LANGUAGE_MAP: Dict[str, str] = {
 # Unified AST Node Structure
 # ---------------------------------------------------------------------------
 # Each node dict has:
-#   type:        str  - node type label (e.g. "FunctionDef", "Import", "Call")
+# type: str  - node type label (e.g. "FunctionDef", "Import", "Call")
 #   name:        str  - identifier name where applicable
 #   value:       Any  - literal value where applicable
 #   lineno:      int  - 1-indexed starting line
@@ -259,9 +258,7 @@ class PythonASTVisitor(ast.NodeVisitor):
     def visit_Expr(self, node: ast.Expr) -> None:  # noqa: N802
         # Capture top-level expressions (e.g., string literals used as docstrings)
         if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-            self.nodes.append(
-                self._node_base(node, "StringExpr", value=node.value.value)
-            )
+            self.nodes.append(self._node_base(node, "StringExpr", value=node.value.value))
         self.generic_visit(node)
 
     def visit_Return(self, node: ast.Return) -> None:  # noqa: N802
@@ -311,8 +308,6 @@ class ASTParser:
     def _init_tree_sitter(self) -> None:
         """Attempt to initialise tree-sitter parsers for JS/Java."""
         try:
-            import tree_sitter  # type: ignore
-
             # Try to load grammars if available
             try:
                 from tree_sitter import Language, Parser  # type: ignore

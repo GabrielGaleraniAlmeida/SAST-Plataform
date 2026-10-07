@@ -46,7 +46,8 @@ Example:
 {{
   "severity": "high",
   "confidence": 0.87,
-  "reasoning": "The user input from request.args is passed directly to a SQL query string without parameterization, making it trivially exploitable for SQL injection. Exploitability is high as no sanitization is visible.",
+  "reasoning": "The user input from request.args is passed directly to a SQL query string without parameterization, \
+making it trivially exploitable for SQL injection. Exploitability is high as no sanitization is visible.",
   "is_false_positive": false,
   "false_positive_reasoning": null
 }}
@@ -91,7 +92,8 @@ Use \\n for newlines inside string values.
 Example for a SQL Injection fix:
 {{
   "fixed_code": "cursor.execute('SELECT * FROM users WHERE id = %s', (user_id,))",
-  "explanation": "Replaced string concatenation with a parameterized query. The database driver now handles escaping, making injection impossible regardless of the input value.",
+  "explanation": "Replaced string concatenation with a parameterized query. The database driver now handles escaping, \
+making injection impossible regardless of the input value.",
   "references": [
     "https://owasp.org/www-community/attacks/SQL_Injection",
     "https://cwe.mitre.org/data/definitions/89.html",

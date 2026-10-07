@@ -13,6 +13,7 @@ from __future__ import annotations
 import logging
 from typing import AsyncIterator
 
+from app.config import settings
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -20,8 +21,6 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
-
-from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +40,11 @@ elif _db_url.startswith("postgresql://"):
 # ---------------------------------------------------------------------------
 engine: AsyncEngine = create_async_engine(
     _db_url,
-    echo=settings.DEBUG,          # log SQL in debug mode
+    echo=settings.DEBUG,  # log SQL in debug mode
     pool_size=10,
     max_overflow=20,
-    pool_pre_ping=True,            # verify connections before checkout
-    pool_recycle=3600,             # recycle connections every hour
+    pool_pre_ping=True,  # verify connections before checkout
+    pool_recycle=3600,  # recycle connections every hour
 )
 
 # ---------------------------------------------------------------------------
@@ -67,6 +66,7 @@ SessionLocal = AsyncSessionLocal
 # ---------------------------------------------------------------------------
 class Base(DeclarativeBase):
     """Base class for all ORM models in the SAST Platform."""
+
     pass
 
 

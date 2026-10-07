@@ -1,16 +1,4 @@
-# =============================================================================
-# .bandit — Bandit Security Linter Configuration
-# =============================================================================
-# Documentation: https://bandit.readthedocs.io/en/latest/config.html
-# Run with:  bandit -r . --configfile .bandit
-# =============================================================================
-
 [bandit]
-
-# ---------------------------------------------------------------------------
-# Target paths
-# ---------------------------------------------------------------------------
-# Directories and files to exclude from scanning
 exclude_dirs =
     venv
     .venv
@@ -24,39 +12,9 @@ exclude_dirs =
     alembic
     docs
     sample_targets
-
-# ---------------------------------------------------------------------------
-# Test selection
-# ---------------------------------------------------------------------------
-# Run ALL tests by default; specific skips below are for known false-positives.
-# To list all test IDs: bandit-baseline --list-tests
-tests =
-
-# Tests to skip globally (justified below)
-skips =
-    # B101 – assert_used: pytest uses assert extensively in tests
-    B101
-    # B105 – hardcoded_password_string: too many FP with config examples
-    # (we rely on semgrep for this)
-    # B311 – random: low-severity; covered by semgrep rule
-    B311
-
-# ---------------------------------------------------------------------------
-# Severity / confidence thresholds
-# ---------------------------------------------------------------------------
-# Report findings at or above this severity level: LOW, MEDIUM, HIGH
-level = LOW
-
-# Report findings at or above this confidence level: LOW, MEDIUM, HIGH
-confidence = LOW
-
-# ---------------------------------------------------------------------------
-# Per-plugin configuration
-# ---------------------------------------------------------------------------
+skips = B101,B311
 
 [bandit.plugins]
-
-# B105, B106, B107 – Hardcoded password detection sensitivity
 hardcoded_password_string.word_list =
     password
     passwd
@@ -69,83 +27,3 @@ hardcoded_password_string.word_list =
     private_key
     auth
     credential
-
-# B108 – Probable insecure usage of temp files
-# (enabled by default; no override needed)
-
-# B324 – hashlib: flag md5 and sha1 usage
-# (enabled by default)
-
-# ---------------------------------------------------------------------------
-# Output configuration (used when running manually; CI overrides with flags)
-# ---------------------------------------------------------------------------
-# Supported formats: csv, custom, html, json, screen, text, xml, yaml
-format = screen
-
-# Maximum line length in text output
-max_line_length = 120
-
-# ---------------------------------------------------------------------------
-# Plugin-specific overrides
-# ---------------------------------------------------------------------------
-
-[bandit.blacklist_calls]
-# B301 – pickle (critical: arbitrary code execution)
-# B302 – marshal
-# B303 – MD5 / SHA1
-# B304 – cipher modes
-# B305 – cipher
-# B306 – mktemp_q
-# B307 – eval
-# B308 – mark_safe (Django)
-# B310 – urllib_urlopen
-# B311 – random (skipped above)
-# B312 – telnetlib
-# B313–B320 – various XML vulnerabilities (XXE)
-# B321 – ftplib
-# B322 – input (Python 2)
-# B323 – unverified_context
-# B324 – hashlib
-# B325 – tempnam / tmpnam
-
-[bandit.blacklist_imports]
-# B401 – import telnetlib
-# B402 – import ftplib
-# B403 – import pickle / cPickle
-# B404 – import subprocess (warn, not fail)
-# B405 – import xml.etree.ElementTree
-# B406 – import xml.sax
-# B407 – import xml.expat
-# B408 – import xml.dom.minidom
-# B409 – import xml.dom.pulldom
-# B410 – import lxml
-# B411 – import xmlrpclib
-# B412 – import httpoxy
-# B413 – import pycrypto
-# B414 – import pycryptodome (note: pycryptodome is acceptable; pycrypto is not)
-
-# ---------------------------------------------------------------------------
-# Baseline (optional)
-# ---------------------------------------------------------------------------
-# To create a baseline (ignore existing findings, only alert on new ones):
-#   bandit -r . --configfile .bandit -f json -o bandit_baseline.json
-# Then run future scans with:
-#   bandit -r . --configfile .bandit --baseline bandit_baseline.json
-# baseline = bandit_baseline.json
-
-# ---------------------------------------------------------------------------
-# Extended configuration notes
-# ---------------------------------------------------------------------------
-# Severity codes:
-#   LOW    – informational; review but don't block CI
-#   MEDIUM – review and address in sprint
-#   HIGH   – must be addressed before merge
-#
-# Confidence codes:
-#   LOW    – heuristic match; may be false positive
-#   MEDIUM – likely a real issue
-#   HIGH   – definite issue
-#
-# CI integration example:
-#   bandit -r . --configfile .bandit -l -ll  (HIGH severity + HIGH confidence)
-#   bandit -r . --configfile .bandit --severity-level high --confidence-level high
