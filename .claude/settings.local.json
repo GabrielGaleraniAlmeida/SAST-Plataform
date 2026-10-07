@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\GabrielGaleraniAlmei\\\\Downloads\\\\Plataforma SAST\" -Recurse -File)",
+      "Bash(Select-Object -First 30 FullName)",
+      "Bash(python -m pip install -q pydantic-settings celery redis psycopg2-binary asyncpg sqlalchemy)",
+      "Bash(python -)",
+      "Bash(PYTHONPATH=services/analyzer python -m pytest tests -q -x)",
+      "Bash(PYTHONPATH=services/analyzer python -m pytest tests -q)",
+      "Bash(python -m pytest tests -q)"
+    ]
+  },
+  "enabledPlugins": {
+    "ponytail@ponytail": true
+  }
+}

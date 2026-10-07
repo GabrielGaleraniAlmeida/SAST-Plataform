@@ -1,0 +1,106 @@
+x-api-env: &api-env
+  DATABASE_URL: postgresql+psycopg2://sast_user:sast_pass@db:5432/sast_db
+  REDIS_URL: redis://redis:6379/0
+  ANALYZER_URL: http://analyzer:8001
+  AI_URL: http://ai:8001
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sast_db
+      POSTGRES_USER: sast_user
+      POSTGRES_PASSWORD: sast_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sast_user -d sast_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./services/api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    environment: *api-env
+
+  celery_worker:
+    build: ./services/api
+    restart: unless-stopped
+    command: celery -A app.tasks worker --loglevel=info --concurrency=2
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      analyzer: {condition: service_started}
+    environment: *api-env
+
+  analyzer:
+    build: ./services/analyzer
+    restart: unless-stopped
+
+  ai:
+    build: ./services/ai
+    restart: unless-stopped
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
+      OLLAMA_MAX_CONCURRENCY: ${OLLAMA_MAX_CONCURRENCY:-2}
+    depends_on:
+      ollama:
+        condition: service_healthy
+      ollama_model:
+        condition: service_completed_successfully
+
+  ollama:
+    image: ollama/ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  ollama_model:
+    image: ollama/ollama
+    restart: "no"
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["ollama pull \"$${OLLAMA_MODEL}\""]
+
+  dashboard:
+    build: ./services/dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  ollama_data:
