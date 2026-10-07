@@ -221,7 +221,7 @@ jobs:
         id: build
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: services/api
           platforms: linux/amd64,linux/arm64
           push: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
           tags: ${{ steps.meta.outputs.tags }}
@@ -237,7 +237,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v5
         with:
-          context: .
+          context: services/api
           push: false
           tags: sast-platform:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
@@ -255,15 +255,21 @@ jobs:
 
     steps:
       - name: Verify image pushed
+        env:
+          IMAGE_DIGEST: ${{ needs.build-docker.outputs.image-digest }}
+          IMAGE_TAGS: ${{ needs.build-docker.outputs.image-tag }}
         run: |
           echo "Image successfully built and pushed in build-docker job."
-          echo "Digest: ${{ needs.build-docker.outputs.image-digest }}"
-          echo "Tags:   ${{ needs.build-docker.outputs.image-tag }}"
+          echo "Digest: $IMAGE_DIGEST"
+          echo "Tags:   $IMAGE_TAGS"
 
       - name: Notify deployment readiness
+        env:
+          IMAGE_REFERENCE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          IMAGE_DIGEST: ${{ needs.build-docker.outputs.image-digest }}
         run: |
-          echo "::notice::Docker image pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "::notice::Digest: ${{ needs.build-docker.outputs.image-digest }}"
+          echo "::notice::Docker image pushed to $IMAGE_REFERENCE"
+          echo "::notice::Digest: $IMAGE_DIGEST"
 
   # ─────────────────────────────────────────────
   # JOB 5 ─ CI Summary
@@ -276,15 +282,22 @@ jobs:
 
     steps:
       - name: Generate CI summary
+        env:
+          LINT_RESULT: ${{ needs.lint.result }}
+          UNIT_TESTS_RESULT: ${{ needs.unit-tests.result }}
+          BUILD_DOCKER_RESULT: ${{ needs.build-docker.result }}
+          COMMIT_SHA: ${{ github.sha }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          TRIGGERED_BY: ${{ github.actor }}
         run: |
           echo "## 🏗️ CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Lint | ${{ needs.lint.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Unit Tests | ${{ needs.unit-tests.result }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Build Docker | ${{ needs.build-docker.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Lint | $LINT_RESULT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Unit Tests | $UNIT_TESTS_RESULT |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Docker | $BUILD_DOCKER_RESULT |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`$COMMIT_SHA\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Branch:** \`$BRANCH_NAME\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Triggered by:** $TRIGGERED_BY" >> "$GITHUB_STEP_SUMMARY"

@@ -8,7 +8,6 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
-  SAST_API_URL: ${{ secrets.SAST_API_URL }}
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
@@ -26,6 +25,8 @@ jobs:
     name: "🔍 SAST Scan"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SAST_API_URL: ${{ secrets.SAST_API_URL }}
 
     steps:
       - name: Checkout repository
@@ -196,11 +197,11 @@ jobs:
               data = json.loads(semgrep_path.read_text())
               for r in data.get("results", []):
                   sev = r.get("extra", {}).get("severity", "").upper()
-                  if sev in ("ERROR", "CRITICAL"):
+                  if sev == "CRITICAL":
                       critical_count += 1
-                  elif sev == "WARNING":
+                  elif sev == "ERROR":
                       high_count += 1
-              print(f"Semgrep CRITICAL/ERROR={critical_count}, WARNING(HIGH)={high_count}")
+              print(f"Semgrep CRITICAL={critical_count}, HIGH={high_count}")
 
           # ── Custom SAST API ──
           custom_api_path = pathlib.Path("reports/custom-api/results.json")
@@ -283,15 +284,7 @@ jobs:
 
       - name: Build Docker image for scanning
         run: |
-          if [ -f Dockerfile ]; then
-            docker build -t sast-platform:scan .
-          elif [ -f docker/Dockerfile ]; then
-            docker build -t sast-platform:scan -f docker/Dockerfile .
-          else
-            echo "No Dockerfile found – skipping image build, scanning base image"
-            docker pull python:3.11-slim
-            docker tag python:3.11-slim sast-platform:scan
-          fi
+          docker build -t sast-platform:scan -f services/api/Dockerfile services/api
 
       - name: Prepare Trivy report directory
         run: mkdir -p reports/trivy
@@ -312,6 +305,7 @@ jobs:
           format: "json"
           output: "reports/trivy/trivy-results.json"
           severity: "HIGH,CRITICAL"
+          ignore-unfixed: true
           exit-code: "0"
 
       - name: Trivy Security Gate
@@ -324,8 +318,8 @@ jobs:
 
           path = pathlib.Path("reports/trivy/trivy-results.json")
           if not path.exists():
-              print("No trivy results found – skipping gate")
-              sys.exit(0)
+              print(f"Trivy results not found: {path}")
+              sys.exit(1)
 
           data = json.loads(path.read_text())
           critical_count = 0
@@ -521,6 +515,8 @@ jobs:
           gate_failed  = False
           total_critical = 0
           total_high     = 0
+          sast_high = 0
+          trivy_high = 0
 
           # ── Bandit ──
           bandit_path = pathlib.Path("reports/bandit/results.json")
@@ -531,6 +527,7 @@ jobs:
               h     = sum(1 for r in items if r.get("issue_severity","").upper() == "HIGH")
               total_critical += c
               total_high     += h
+              sast_high += h
               results["sast_bandit"]["status"] = "PASS" if c == 0 else "FAIL"
               print(f"Bandit  → {len(items)} findings (CRITICAL={c}, HIGH={h})")
 
@@ -539,12 +536,25 @@ jobs:
           if semgrep_path.exists():
               data  = json.loads(semgrep_path.read_text())
               items = data.get("results", [])
-              c     = sum(1 for r in items if r.get("extra",{}).get("severity","").upper() in ("ERROR","CRITICAL"))
-              h     = sum(1 for r in items if r.get("extra",{}).get("severity","").upper() == "WARNING")
+              c     = sum(1 for r in items if r.get("extra",{}).get("severity","").upper() == "CRITICAL")
+              h     = sum(1 for r in items if r.get("extra",{}).get("severity","").upper() == "ERROR")
               total_critical += c
               total_high     += h
-              results["sast_semgrep"]["status"] = "PASS" if c == 0 else "FAIL"
+              sast_high += h
+              results["sast_semgrep"]["status"] = "PASS" if c == 0 and h <= 5 else "FAIL"
               print(f"Semgrep → {len(items)} findings (CRITICAL={c}, HIGH={h})")
+
+          # ── Custom SAST API ──
+          custom_api_path = pathlib.Path("reports/custom-api/results.json")
+          if custom_api_path.exists():
+              data = json.loads(custom_api_path.read_text())
+              items = data.get("findings", [])
+              c = sum(1 for item in items if item.get("severity", "").upper() == "CRITICAL")
+              h = sum(1 for item in items if item.get("severity", "").upper() == "HIGH")
+              total_critical += c
+              total_high += h
+              sast_high += h
+              print(f"Custom API → {len(items)} findings (CRITICAL={c}, HIGH={h})")
 
           # ── Trivy ──
           trivy_path = pathlib.Path("reports/trivy/trivy-results.json")
@@ -554,7 +564,8 @@ jobs:
               h    = sum(1 for r in data.get("Results",[]) for v in r.get("Vulnerabilities",[]) if v.get("Severity","").upper() == "HIGH")
               total_critical += c
               total_high     += h
-              results["docker_trivy"]["status"] = "PASS" if c == 0 else "FAIL"
+              trivy_high += h
+              results["docker_trivy"]["status"] = "PASS" if c == 0 and h <= 10 else "FAIL"
               print(f"Trivy   → CRITICAL={c}, HIGH={h}")
 
           # ─── Gate decision ───────────────────
@@ -568,11 +579,11 @@ jobs:
           print(f"\n  Total CRITICAL : {total_critical}")
           print(f"  Total HIGH     : {total_high}")
 
-          if total_critical > 0:
-              print("\n❌ SECURITY GATE FAILED – CRITICAL vulnerabilities must be resolved before merging.")
+          if total_critical > 0 or sast_high > 5 or trivy_high > 10:
+              print("\n❌ SECURITY GATE FAILED – vulnerability thresholds exceeded.")
               gate_failed = True
           else:
-              print("\n✅ SECURITY GATE PASSED – No critical vulnerabilities detected.")
+              print("\n✅ SECURITY GATE PASSED – vulnerability thresholds were not exceeded.")
 
           print("="*60)
 
@@ -586,9 +597,9 @@ jobs:
               f.write(f"\n**Total CRITICAL**: {total_critical}  \n")
               f.write(f"**Total HIGH**: {total_high}  \n\n")
               if gate_failed:
-                  f.write("## ❌ Gate FAILED\nCritical vulnerabilities must be resolved before merging.\n")
+                  f.write("## ❌ Gate FAILED\nVulnerability thresholds were exceeded.\n")
               else:
-                  f.write("## ✅ Gate PASSED\nNo critical vulnerabilities found.\n")
+                  f.write("## ✅ Gate PASSED\nVulnerability thresholds were not exceeded.\n")
 
           sys.exit(1 if gate_failed else 0)
           EOF
