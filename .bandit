@@ -1,0 +1,29 @@
+[bandit]
+exclude_dirs =
+    venv
+    .venv
+    env
+    .env
+    __pycache__
+    .git
+    .github
+    node_modules
+    migrations
+    alembic
+    docs
+    sample_targets
+skips = B101,B311
+
+[bandit.plugins]
+hardcoded_password_string.word_list =
+    password
+    passwd
+    pwd
+    secret
+    token
+    api_key
+    apikey
+    access_key
+    private_key
+    auth
+    credential
