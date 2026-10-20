@@ -14,14 +14,14 @@ import logging
 import re
 from typing import Any, Optional
 
-from app.llm_client import OllamaClient
-from app.models import (
+from .llm_client import OllamaClient
+from .models import (
     RemediationResult,
     SeverityLevel,
     SeverityResult,
     VulnerabilityInput,
 )
-from app.prompts import (
+from .prompts import (
     EXPLANATION_PROMPT,
     FALSE_POSITIVE_TRIAGE_PROMPT,
     REMEDIATION_PROMPT,
@@ -37,29 +37,29 @@ logger = logging.getLogger(__name__)
 
 _RULE_BASED_SEVERITY: dict[str, SeverityLevel] = {
     # Injection flaws
-    "sql_injection": SeverityLevel.CRITICAL,
-    "command_injection": SeverityLevel.CRITICAL,
-    "code_injection": SeverityLevel.CRITICAL,
-    "ldap_injection": SeverityLevel.HIGH,
-    "xpath_injection": SeverityLevel.HIGH,
+    "sql_injection":       SeverityLevel.CRITICAL,
+    "command_injection":   SeverityLevel.CRITICAL,
+    "code_injection":      SeverityLevel.CRITICAL,
+    "ldap_injection":      SeverityLevel.HIGH,
+    "xpath_injection":     SeverityLevel.HIGH,
     # Auth / crypto
-    "hardcoded_secret": SeverityLevel.HIGH,
-    "hardcoded_password": SeverityLevel.HIGH,
-    "weak_crypto": SeverityLevel.MEDIUM,
-    "broken_auth": SeverityLevel.HIGH,
+    "hardcoded_secret":    SeverityLevel.HIGH,
+    "hardcoded_password":  SeverityLevel.HIGH,
+    "weak_crypto":         SeverityLevel.MEDIUM,
+    "broken_auth":         SeverityLevel.HIGH,
     # Web
-    "xss": SeverityLevel.HIGH,
-    "csrf": SeverityLevel.MEDIUM,
-    "ssrf": SeverityLevel.HIGH,
-    "open_redirect": SeverityLevel.MEDIUM,
+    "xss":                 SeverityLevel.HIGH,
+    "csrf":                SeverityLevel.MEDIUM,
+    "ssrf":                SeverityLevel.HIGH,
+    "open_redirect":       SeverityLevel.MEDIUM,
     # File system
-    "path_traversal": SeverityLevel.HIGH,
-    "file_inclusion": SeverityLevel.HIGH,
+    "path_traversal":      SeverityLevel.HIGH,
+    "file_inclusion":      SeverityLevel.HIGH,
     # Misc
-    "insecure_deserial": SeverityLevel.HIGH,
-    "xxe": SeverityLevel.HIGH,
-    "race_condition": SeverityLevel.MEDIUM,
-    "info_disclosure": SeverityLevel.LOW,
+    "insecure_deserial":   SeverityLevel.HIGH,
+    "xxe":                 SeverityLevel.HIGH,
+    "race_condition":      SeverityLevel.MEDIUM,
+    "info_disclosure":     SeverityLevel.LOW,
 }
 
 _JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*([\s\S]+?)\s*```", re.IGNORECASE)
@@ -113,7 +113,9 @@ class AISecurityAnalyzer:
         # Record comparison vs. original scanner severity
         if vulnerability.existing_severity:
             result.original_severity = vulnerability.existing_severity
-            result.severity_changed = result.severity != vulnerability.existing_severity
+            result.severity_changed = (
+                result.severity != vulnerability.existing_severity
+            )
 
         return result
 
@@ -134,7 +136,11 @@ class AISecurityAnalyzer:
         sev_str = (
             severity.value
             if severity
-            else (vulnerability.existing_severity.value if vulnerability.existing_severity else "unknown")
+            else (
+                vulnerability.existing_severity.value
+                if vulnerability.existing_severity
+                else "unknown"
+            )
         )
 
         prompt = self._client._build_prompt(
@@ -167,7 +173,11 @@ class AISecurityAnalyzer:
         sev_str = (
             severity.value
             if severity
-            else (vulnerability.existing_severity.value if vulnerability.existing_severity else "unknown")
+            else (
+                vulnerability.existing_severity.value
+                if vulnerability.existing_severity
+                else "unknown"
+            )
         )
 
         prompt = self._client._build_prompt(
@@ -267,7 +277,19 @@ class AISecurityAnalyzer:
             "Using rule-based severity fallback for rule_id=%s",
             vulnerability.rule_id,
         )
-        fallback_severity = self._rule_based_severity(vulnerability.rule_id)
+        fallback_severity = self._rule_based_severity(
+            " ".join(
+                filter(
+                    None,
+                    [
+                        vulnerability.rule_id,
+                        vulnerability.rule_name,
+                        vulnerability.category.value if vulnerability.category else "",
+                        vulnerability.cwe_id or "",
+                    ],
+                )
+            )
+        )
         return SeverityResult(
             severity=fallback_severity,
             confidence=0.4,
@@ -299,7 +321,9 @@ class AISecurityAnalyzer:
 
                 return RemediationResult(
                     fixed_code=data.get("fixed_code") or None,
-                    explanation=str(data.get("explanation", "No explanation provided.")),
+                    explanation=str(
+                        data.get("explanation", "No explanation provided.")
+                    ),
                     references=list(references),
                     estimated_effort=data.get("estimated_effort") or None,
                     breaking_change=bool(data.get("breaking_change", False)),
@@ -355,8 +379,8 @@ class AISecurityAnalyzer:
             triage = triage_map.get(key, {})
             enriched_finding = dict(finding)
             enriched_finding["is_false_positive"] = triage.get("is_false_positive", False)
-            enriched_finding["fp_confidence"] = triage.get("confidence", 0.0)
-            enriched_finding["fp_reasoning"] = triage.get("reasoning", "")
+            enriched_finding["fp_confidence"]     = triage.get("confidence", 0.0)
+            enriched_finding["fp_reasoning"]      = triage.get("reasoning", "")
             enriched.append(enriched_finding)
 
         return enriched
@@ -411,8 +435,8 @@ class AISecurityAnalyzer:
         """
         Assign a severity level based on rule_id keywords when the LLM is unavailable.
         """
-        rule_lower = rule_id.lower()
+        normalized = re.sub(r"[^a-z0-9]+", "_", rule_id.lower())
         for keyword, severity in _RULE_BASED_SEVERITY.items():
-            if keyword in rule_lower:
+            if keyword in normalized:
                 return severity
         return SeverityLevel.MEDIUM  # Safe default

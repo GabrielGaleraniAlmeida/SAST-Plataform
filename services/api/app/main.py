@@ -14,12 +14,14 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from app.config import settings
-from app.database import Base, engine
-from app.routers import health, scans, stats, vulnerabilities
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
+
+from app.config import settings
+from app.database import engine, Base
+from app.routers import scans, vulnerabilities, stats, health
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -42,6 +44,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.info("Database schema synchronised.")
     except Exception as e:
         logger.warning(f"Database schema sync skipped or partially failed (usually safe if Enums already exist): {e}")
+    async with engine.begin() as conn:
+        await conn.execute(
+            text(
+                "ALTER TABLE vulnerabilities "
+                "ADD COLUMN IF NOT EXISTS taint_metadata JSON"
+            )
+        )
+        await conn.execute(
+            text("ALTER TABLE vulnerabilities ADD COLUMN IF NOT EXISTS ai_triage JSON")
+        )
+        await conn.execute(
+            text("ALTER TABLE scans ADD COLUMN IF NOT EXISTS taint_flows JSON")
+        )
     yield
     logger.info("Shutting down – disposing DB engine …")
     await engine.dispose()
@@ -72,9 +87,10 @@ def create_application() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CORS middleware
     application.add_middleware(
         CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -84,7 +100,9 @@ def create_application() -> FastAPI:
     api_prefix = "/api/v1"
     application.include_router(health.router, prefix=api_prefix, tags=["Health"])
     application.include_router(scans.router, prefix=api_prefix, tags=["Scans"])
-    application.include_router(vulnerabilities.router, prefix=api_prefix, tags=["Vulnerabilities"])
+    application.include_router(
+        vulnerabilities.router, prefix=api_prefix, tags=["Vulnerabilities"]
+    )
     application.include_router(stats.router, prefix=api_prefix, tags=["Statistics"])
 
     return application

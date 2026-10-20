@@ -1,0 +1,33 @@
+[
+  {
+    "id": "direct-shell-source",
+    "kind": "true-positive",
+    "expected_finding": true,
+    "code": "import os\nfrom flask import request\n\ndef handle():\n    os.system(request.args.get('cmd'))\n"
+  },
+  {
+    "id": "intermediate-shell-source",
+    "kind": "true-positive",
+    "expected_finding": true,
+    "code": "import os\nfrom flask import request\n\ndef handle():\n    command = request.args.get('cmd')\n    os.system(command)\n"
+  },
+  {
+    "id": "dictionary-mutation",
+    "kind": "true-positive",
+    "expected_finding": true,
+    "code": "import os\nfrom flask import request\n\ndef handle():\n    values = {'cmd': request.args.get('cmd')}\n    values.update({'other': 'constant'})\n    os.system(values['cmd'])\n"
+  },
+  {
+    "id": "contextual-shell-quoting",
+    "kind": "sanitized",
+    "expected_finding": false,
+    "expected_sanitized": true,
+    "code": "import os\nimport shlex\nfrom flask import request\n\ndef handle():\n    command = shlex.quote(request.args.get('cmd'))\n    os.system('echo ' + command)\n"
+  },
+  {
+    "id": "independent-function-local",
+    "kind": "true-negative",
+    "expected_finding": false,
+    "code": "import os\nfrom flask import request\n\ndef read_input():\n    command = request.args.get('cmd')\n\ndef safe_local():\n    command = 'status'\n    os.system(command)\n"
+  }
+]

@@ -9,10 +9,11 @@ can be constructed directly from ORM objects.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from app.enums import ScanStatus, Severity
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, computed_field
+
+from app.enums import Severity, ScanStatus
 
 
 # ===========================================================================
@@ -20,7 +21,6 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field
 # ===========================================================================
 class _OrmBase(BaseModel):
     """Base model that enables ORM-mode for all subclasses."""
-
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -29,7 +29,6 @@ class _OrmBase(BaseModel):
 # ===========================================================================
 class ScanCreate(BaseModel):
     """Payload accepted when starting a new scan."""
-
     repository_url: str = Field(
         ...,
         description="Full URL of the Git repository to scan.",
@@ -58,7 +57,6 @@ class ScanFileRequest(BaseModel):
 
 class ScanUpdate(BaseModel):
     """Partial update allowed for a scan (internal use / admin)."""
-
     status: Optional[ScanStatus] = None
     language: Optional[str] = None
     total_files: Optional[int] = None
@@ -67,9 +65,21 @@ class ScanUpdate(BaseModel):
     celery_task_id: Optional[str] = None
 
 
+class TaintFlow(BaseModel):
+    file_path: Optional[str] = None
+    source: str
+    sink: str
+    source_line: int = Field(..., ge=1)
+    sink_line: int = Field(..., ge=1)
+    path: Optional[List[int]] = None
+    is_sanitized: bool
+    variable: str
+    function_name: Optional[str] = None
+    intermediates: List[str] = Field(default_factory=list)
+
+
 class ScanResponse(_OrmBase):
     """Full scan representation returned to API consumers."""
-
     id: int
     repository_url: str
     branch: str
@@ -79,6 +89,7 @@ class ScanResponse(_OrmBase):
     completed_at: Optional[datetime]
     total_files: int
     total_vulnerabilities: int
+    taint_flows: Optional[List[TaintFlow]] = None
     celery_task_id: Optional[str]
 
     @computed_field
@@ -90,7 +101,6 @@ class ScanResponse(_OrmBase):
 
 class ScanListResponse(BaseModel):
     """Paginated list of scans."""
-
     items: List[ScanResponse]
     total: int
     page: int
@@ -103,7 +113,6 @@ class ScanListResponse(BaseModel):
 # ===========================================================================
 class VulnerabilityCreate(BaseModel):
     """Used internally when the analyzer pushes findings into the API."""
-
     scan_id: int
     file_path: str = Field(..., max_length=4096)
     line_number: int = Field(..., ge=1)
@@ -117,19 +126,19 @@ class VulnerabilityCreate(BaseModel):
     code_snippet: Optional[str] = None
     ai_suggestion: Optional[str] = None
     ai_severity: Optional[str] = None
+    ai_triage: Optional[Dict[str, Any]] = None
     confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    taint_metadata: Optional[TaintFlow] = None
 
 
 class VulnerabilitySuppressRequest(BaseModel):
     """Body for the suppress endpoint."""
-
     suppressed: bool = True
     reason: Optional[str] = Field(default=None, max_length=1024)
 
 
 class VulnerabilityResponse(_OrmBase):
     """Vulnerability detail returned to API consumers."""
-
     id: int
     scan_id: int
     file_path: str
@@ -142,8 +151,10 @@ class VulnerabilityResponse(_OrmBase):
     title: str
     description: Optional[str]
     code_snippet: Optional[str]
+    taint_metadata: Optional[TaintFlow]
     ai_suggestion: Optional[str]
     ai_severity: Optional[str]
+    ai_triage: Optional[Dict[str, Any]]
     confidence: Optional[float]
     suppressed: bool
     suppressed_reason: Optional[str]
@@ -152,7 +163,6 @@ class VulnerabilityResponse(_OrmBase):
 
 class VulnerabilityListResponse(BaseModel):
     """Paginated list of vulnerabilities."""
-
     items: List[VulnerabilityResponse]
     total: int
     page: int
@@ -190,7 +200,6 @@ class SeverityCount(BaseModel):
 
 class SummaryResponse(BaseModel):
     """High-level platform health numbers."""
-
     total_scans: int
     total_vulnerabilities: int
     active_scans: int
@@ -234,7 +243,6 @@ class ByRuleResponse(BaseModel):
 
 class SeverityDistributionResponse(BaseModel):
     """Suitable for a pie / donut chart."""
-
     labels: List[str]
     values: List[int]
     colors: List[str]
