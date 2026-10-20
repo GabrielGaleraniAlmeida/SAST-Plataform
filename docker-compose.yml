@@ -1,26 +1,46 @@
+# MELHORIA 8 + 1 — docker-compose.yml com variáveis de ambiente e portas corrigidas
+#
+# Portas dos serviços internos:
+#   api      → 8000 (exposta apenas em 127.0.0.1)
+#   analyzer → 8002 (interna, não exposta ao host por padrão)
+#   ai       → 8003 (interna, não exposta ao host por padrão)
+#   ollama   → 11434 (exposta apenas em 127.0.0.1)
+#   dashboard → 3000 (exposta apenas em 127.0.0.1)
+#
+# Copie .env.example para .env antes de executar `docker compose up`.
+
 x-api-env: &api-env
-  DATABASE_URL: postgresql+psycopg2://sast_user:sast_pass@db:5432/sast_db
-  REDIS_URL: redis://redis:6379/0
-  ANALYZER_URL: http://analyzer:8001
-  AI_URL: http://ai:8001
+  DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL in .env}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  # Aponta para as portas internas corretas de cada serviço
+  ANALYZER_URL: ${ANALYZER_URL:-http://analyzer:8002}
+  AI_URL: ${AI_URL:-http://ai:8003}
+  SAST_API_KEY: ${SAST_API_KEY:-}
+  DEBUG: ${DEBUG:-false}
 
 services:
+  # ------------------------------------------------------------------
+  # Banco de Dados
+  # ------------------------------------------------------------------
   db:
     image: postgres:15
     restart: unless-stopped
     environment:
-      POSTGRES_DB: sast_db
-      POSTGRES_USER: sast_user
-      POSTGRES_PASSWORD: sast_pass
+      POSTGRES_DB: ${POSTGRES_DB:-sast_db}
+      POSTGRES_USER: ${POSTGRES_USER:-sast_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sast_user -d sast_db"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sast_user} -d ${POSTGRES_DB:-sast_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
+  # ------------------------------------------------------------------
+  # Message Broker
+  # ------------------------------------------------------------------
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -30,17 +50,25 @@ services:
       timeout: 5s
       retries: 5
 
+  # ------------------------------------------------------------------
+  # API REST (porta local: 8000)
+  # ------------------------------------------------------------------
   api:
+    image: plataformasast-api:local
     build: ./services/api
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"   # Swagger/OpenAPI disponível apenas localmente
     depends_on:
       db: {condition: service_healthy}
       redis: {condition: service_healthy}
     environment: *api-env
 
+  # ------------------------------------------------------------------
+  # Celery Worker (usa a mesma imagem da API)
+  # ------------------------------------------------------------------
   celery_worker:
+    image: plataformasast-api:local
     build: ./services/api
     restart: unless-stopped
     command: celery -A app.tasks worker --loglevel=info --concurrency=2
@@ -50,15 +78,31 @@ services:
       analyzer: {condition: service_started}
     environment: *api-env
 
+  # ------------------------------------------------------------------
+  # Serviço Analyzer (SAST Engine) — porta interna: 8002
+  # ------------------------------------------------------------------
   analyzer:
+    image: plataformasast-analyzer:local
     build: ./services/analyzer
     restart: unless-stopped
+    # Porta interna 8002 (diferente de 8000 da API e 8003 do AI)
+    # Descomente a linha abaixo para expor ao host em debug:
+    # ports:
+    #   - "8002:8002"
 
+  # ------------------------------------------------------------------
+  # Serviço de IA (Ollama client) — porta interna: 8003
+  # ------------------------------------------------------------------
   ai:
+    image: plataformasast-ai:local
     build: ./services/ai
     restart: unless-stopped
+    # Porta interna 8003 (diferente de 8000 da API e 8002 do Analyzer)
+    # Descomente a linha abaixo para expor ao host em debug:
+    # ports:
+    #   - "8003:8003"
     environment:
-      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3}
       OLLAMA_MAX_CONCURRENCY: ${OLLAMA_MAX_CONCURRENCY:-2}
     depends_on:
@@ -67,11 +111,14 @@ services:
       ollama_model:
         condition: service_completed_successfully
 
+  # ------------------------------------------------------------------
+  # Ollama (servidor LLM local) — porta local: 11434
+  # ------------------------------------------------------------------
   ollama:
     image: ollama/ollama
     restart: unless-stopped
     ports:
-      - "11434:11434"
+      - "127.0.0.1:11434:11434"   # API Ollama disponível apenas localmente
     volumes:
       - ollama_data:/root/.ollama
     healthcheck:
@@ -81,6 +128,9 @@ services:
       retries: 10
       start_period: 10s
 
+  # ------------------------------------------------------------------
+  # Job único: baixa o modelo Ollama na primeira inicialização
+  # ------------------------------------------------------------------
   ollama_model:
     image: ollama/ollama
     restart: "no"
@@ -93,11 +143,15 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: ["ollama pull \"$${OLLAMA_MODEL}\""]
 
+  # ------------------------------------------------------------------
+  # Dashboard React (servido via Nginx) — porta local: 3000
+  # ------------------------------------------------------------------
   dashboard:
+    image: plataformasast-dashboard:local
     build: ./services/dashboard
     restart: unless-stopped
     ports:
-      - "3000:8080"
+      - "127.0.0.1:3000:80"   # Dashboard disponível apenas localmente
     depends_on:
       - api
 

@@ -139,7 +139,7 @@ export default function ScansList() {
                   <td colSpan={8} className="py-16 text-center">
                     <ScanLine className="h-10 w-10 text-gray-200 mx-auto mb-3" />
                     <p className="text-gray-500 text-sm font-medium">No scans found</p>
-                    <p className="text-gray-400 text-xs mt-1">Click "New Scan" to get started</p>
+                    <p className="text-gray-400 text-xs mt-1">Click &quot;New Scan&quot; to get started</p>
                   </td>
                 </tr>
               ) : (

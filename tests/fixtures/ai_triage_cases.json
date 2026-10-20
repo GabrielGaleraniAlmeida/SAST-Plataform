@@ -1,0 +1,44 @@
+[
+  {
+    "id": "user-input-to-shell",
+    "ground_truth_is_false_positive": false,
+    "rationale": "HTTP query input is passed to os.system without a sanitizer.",
+    "finding": {
+      "rule_id": "SAST-003",
+      "rule_name": "Command Injection",
+      "description": "Request-controlled data reaches a shell command.",
+      "file_path": "app.py",
+      "line_number": 6,
+      "language": "python",
+      "code_snippet": "command = request.args.get('cmd')\\nos.system(command)"
+    }
+  },
+  {
+    "id": "parameterized-sql-query",
+    "ground_truth_is_false_positive": true,
+    "rationale": "The query uses a placeholder and supplies the value separately.",
+    "finding": {
+      "rule_id": "SAST-002",
+      "rule_name": "SQL Injection",
+      "description": "The scanner reported a SQL injection candidate.",
+      "file_path": "users.py",
+      "line_number": 8,
+      "language": "python",
+      "code_snippet": "cursor.execute('SELECT * FROM users WHERE id = ?', (user_id,))"
+    }
+  },
+  {
+    "id": "documented-placeholder-secret",
+    "ground_truth_is_false_positive": true,
+    "rationale": "The value is an explicitly named non-secret example placeholder.",
+    "finding": {
+      "rule_id": "SAST-001",
+      "rule_name": "Hardcoded Secret",
+      "description": "A credential-like literal was reported.",
+      "file_path": "examples/config.py",
+      "line_number": 2,
+      "language": "python",
+      "code_snippet": "EXAMPLE_API_KEY = 'EXAMPLE_KEY'"
+    }
+  }
+]

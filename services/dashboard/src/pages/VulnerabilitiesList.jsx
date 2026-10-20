@@ -58,6 +58,13 @@ export default function VulnerabilitiesList() {
                         ✨ Sugestão IA: {v.ai_suggestion.substring(0, 80)}...
                       </div>
                     )}
+                    {v.ai_triage && (
+                      <div className="mt-2 text-xs text-slate-600">
+                        Triagem IA: {v.ai_triage.is_false_positive ? 'possível falso positivo' : 'não classificado como falso positivo'}
+                        {' '}({Math.round((v.ai_triage.confidence || 0) * 100)}% de confiança)
+                        {v.ai_triage.reasoning ? ` — ${v.ai_triage.reasoning}` : ''}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
