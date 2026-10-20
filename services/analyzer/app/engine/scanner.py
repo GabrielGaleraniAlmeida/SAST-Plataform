@@ -6,6 +6,7 @@ import tempfile
 from typing import Any, Dict, List
 
 import git
+
 from app.engine.parser import ASTParser
 from app.engine.rules import RulesEngine
 from app.engine.taint_analysis import TaintAnalyzer
@@ -48,6 +49,7 @@ class SASTScanner:
     def scan_directory(self, directory: str, language: str = "auto") -> Dict[str, Any]:
         vulnerabilities: List[Dict[str, Any]] = []
         files: List[Dict[str, Any]] = []
+        taint_flows: List[Dict[str, Any]] = []
         for root, dirs, names in os.walk(directory):
             dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
             for name in names:
@@ -58,37 +60,61 @@ class SASTScanner:
                 with open(path, encoding="utf-8", errors="replace") as fh:
                     code = fh.read()
                 rel = os.path.relpath(path, directory).replace(os.sep, "/")
-                found = self.scan_snippet(code, lang, rel)
+                found, file_flows = self._scan_snippet(code, lang, rel)
                 vulnerabilities.extend(found)
-                files.append(
-                    {
-                        "file_path": rel,
-                        "language": lang,
-                        "lines_of_code": code.count("\n") + 1,
-                        "vulnerabilities_count": len(found),
-                    }
+                taint_flows.extend(
+                    {"file_path": rel, **flow} for flow in file_flows
                 )
-        return {"vulnerabilities": vulnerabilities, "files": files, "total_files": len(files)}
+                files.append({
+                    "file_path": rel,
+                    "language": lang,
+                    "lines_of_code": code.count("\n") + 1,
+                    "vulnerabilities_count": len(found),
+                })
+        return {
+            "vulnerabilities": vulnerabilities,
+            "taint_flows": taint_flows,
+            "files": files,
+            "total_files": len(files),
+        }
 
     def scan_snippet(self, code: str, language: str, filename: str = "snippet.py") -> List[Dict[str, Any]]:
+        findings, _ = self._scan_snippet(code, language, filename)
+        return findings
+
+    def _scan_snippet(
+        self, code: str, language: str, filename: str
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         ast_data = self.parser.parse_code(code, language)
-        findings = [_flat(f, filename) for f in self.rules_engine.check_all(ast_data, code, language, filename)]
+        findings = [
+            _flat(f, filename)
+            for f in self.rules_engine.check_all(ast_data, code, language, filename)
+        ]
+        flows = self.taint_analyzer.analyze(ast_data, code) if language == "python" else []
         if language == "python":
-            for flow in self.taint_analyzer.analyze(ast_data, code):
+            for flow in flows:
                 if flow["is_sanitized"]:
                     continue
-                findings.append(
-                    {
-                        "file_path": filename,
-                        "line_number": flow["path"][-1],
-                        "rule_id": "SAST-TAINT-001",
-                        "rule_name": "Fluxo de Dados Não Sanitizado",
-                        "severity": "critical",
-                        "cwe_id": "CWE-20",
-                        "title": f"Tainted flow to {flow['sink']}",
-                        "description": f"Input inseguro atinge a função '{flow['sink']}' sem sanitização prévia.",
-                        "code_snippet": f"{flow['variable']} -> {flow['sink']}()",
-                        "language": language,
-                    }
-                )
-        return findings
+                findings.append({
+                    "file_path": filename,
+                    "line_number": flow["sink_line"],
+                    "rule_id": "SAST-TAINT-001",
+                    "rule_name": "Fluxo de Dados Não Sanitizado",
+                    "severity": "critical",
+                    "cwe_id": "CWE-20",
+                    "title": f"Tainted flow to {flow['sink']}",
+                    "description": f"Input inseguro atinge a função '{flow['sink']}' sem sanitização prévia.",
+                    "code_snippet": f"{flow['variable']} -> {flow['sink']}()",
+                    "language": language,
+                    "taint_metadata": {
+                        "source": flow["source"],
+                        "sink": flow["sink"],
+                        "source_line": flow["source_line"],
+                        "sink_line": flow["sink_line"],
+                        "is_sanitized": flow["is_sanitized"],
+                        "variable": flow["variable"],
+                        "function_name": flow["function_name"],
+                        "intermediates": flow["intermediates"],
+                    },
+                })
+        return findings, flows
